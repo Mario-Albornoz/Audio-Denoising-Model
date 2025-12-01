@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 def compute_snr(clean : torch.Tensor, enhanced : torch.Tensor, eps = 1e-8):
     #flatten time dimension
-    noise = clean - enhanced
+    noise = enhanced - clean
 
     #-1 and -2 represent the last dimensions of the file (time (sample_rate) and chanels)
     clean_power = torch.mean(clean ** 2, dim=(-1,-2)) if clean.dim() > 1 else torch.mean(clean**2)
@@ -51,3 +51,6 @@ def si_sdr_loss(estimation, reference, eps=1e-8) -> torch.Tensor  :
     si_sdr = 10 * torch.log10(ratio + eps)
 
     return -torch.mean(si_sdr)
+
+def si_sdr_loss(estimation: torch.Tensor, reference: torch.Tensor, eps = 1e-8):
+    return None

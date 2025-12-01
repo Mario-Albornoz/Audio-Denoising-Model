@@ -13,7 +13,7 @@ class DenoisingDataSet(Dataset):
             noisy_dir: str,
             clean_dir: str,
             target_sr: int = 16000,
-            segment_length: int = 16000 * 3,
+            segment_length: int = 80000,
     ):
         self.noisy_dir = Path(noisy_dir)
         self.clean_dir = Path(clean_dir)
@@ -49,7 +49,7 @@ class DenoisingDataSet(Dataset):
     def __len__(self):
         return len(self.noisy_files)
 
-    def _load_and_resample(self, path: Path):
+    def _load_and_resample(self, path: Path ):
         data, sr = sf.read(str(path), dtype='float32')
         waveform = torch.from_numpy(data)
 

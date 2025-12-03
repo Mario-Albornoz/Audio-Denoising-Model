@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
 
-from src.evaluation.metrics import SpectralLoss
+from src.evaluation.metrics import SpectralLoss, compute_snr
 from src.model.conv_tasnet import ConvTasNet
 from src.utils.audio_dataset import DenoisingDataSet
 
@@ -18,7 +18,8 @@ class ImprovedDenoiseSystem(nn.Module):
     def forward(self, noisy):
         return self.model(noisy)
 
-
+#TODO: refactor training method
+#ADD matrix with hyperparemeters to automize different runs
 def train_model(
         noisy_dir,
         clean_dir,
@@ -40,7 +41,7 @@ def train_model(
     optimizer = optim.AdamW(system.parameters(), lr=lr, weight_decay=1e-5)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=3
+        optimizer, mode='min', factor=0.7, patience=5, min_lr = 1e-6
     )
 
     loss_function = nn.L1Loss()
@@ -51,6 +52,7 @@ def train_model(
     for epoch in range(epochs):
         epoch_start = time.time()
         total_loss = 0
+        total_snr = 0
         batch_count = 0
 
         for batch_idx, batch in enumerate(loader):
@@ -60,15 +62,17 @@ def train_model(
             optimizer.zero_grad()
             enhanced = system(noisy)
             loss = loss_function(enhanced, clean)
+            snr = compute_snr(clean, enhanced)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(system.parameters(), max_norm=5.0)
             optimizer.step()
 
             total_loss += loss.item()
+            total_snr += snr
             batch_count += 1
 
             if (batch_idx + 1) % 25 == 0:
-                print(f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f}")
+                print(f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f} - SNR: {snr}")
 
             if batch_idx % 2 == 0:
                 torch.mps.empty_cache()
@@ -76,11 +80,12 @@ def train_model(
         del noisy, clean, enhanced, loss
         torch.mps.empty_cache()
         avg_loss = total_loss / batch_count
+        avg_snr = total_snr/batch_count
         epoch_time = time.time() - epoch_start
 
         timestamp = datetime.now(timezone.utc)
         print(
-            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} | Time: {epoch_time / 60:.1f}min")
+            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} | SNR: {avg_snr} | Time: {epoch_time / 60:.1f}min")
 
         scheduler.step(avg_loss)
 

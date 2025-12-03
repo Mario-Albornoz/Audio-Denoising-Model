@@ -55,7 +55,7 @@ def compute_snr(clean : torch.Tensor, enhanced : torch.Tensor, eps = 1e-8):
 
     snr = 10.0 * torch.log10((clean_power + eps)/(noise_power + eps))
 
-    return snr.item() if isinstance(snr, torch.Tensor) and snr.numel() else snr
+    return snr
 
 def compute_lsd(clean : torch.Tensor, enhanced : torch.Tensor, n_fft = 512,eps = 1e-8) -> float:
     if clean.dim() == 2:

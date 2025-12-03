@@ -14,13 +14,21 @@ class DenoisingDataSet(Dataset):
             clean_dir: str,
             target_sr: int = 16000,
             segment_length: int = 80000,
+            use_augmentation: bool = False
     ):
         self.noisy_dir = Path(noisy_dir)
         self.clean_dir = Path(clean_dir)
-
         self.target_sr = target_sr
         self.segment_length = segment_length
+        self.stems: list[str] = []
+        self.clear_unmateched_file()
+        self.use_augmentation = use_augmentation
 
+
+    def __len__(self):
+        return len(self.noisy_files)
+
+    def clear_unmateched_file(self):
         noise_files = list(self.noisy_dir.glob("*.wav"))
         raw_files = list(self.clean_dir.glob("*.wav"))
 
@@ -46,9 +54,6 @@ class DenoisingDataSet(Dataset):
 
         self.stems = [p.stem for p in self.noisy_files]
 
-    def __len__(self):
-        return len(self.noisy_files)
-
     def _load_and_resample(self, path: Path ):
         data, sr = sf.read(str(path), dtype='float32')
         waveform = torch.from_numpy(data)
@@ -65,6 +70,23 @@ class DenoisingDataSet(Dataset):
             waveform = waveform.mean(dim=0, keepdim=True)
 
         return waveform
+
+    def _augment(self, noisy, clean):
+        if random.random() > 0.5:
+            gain = random.uniform(0.7,0.13)
+            noisy = gain * noisy
+            clean = gain * clean
+
+        if random.random() > 0.5:
+            shift = random.randint(-1000,1000)
+            noisy = torch.roll(noisy, shifts=shift, dims=-1)
+            clean = torch.roll(clean, shifts=shift, dims=-1)
+
+        if random.random() > 0.5:
+            extra_noise = torch.randn_like(noisy)
+            noisy += extra_noise
+
+        return noisy, clean
 
     def __getitem__(self, idx):
         noisy_path = self.noisy_files[idx]
@@ -86,6 +108,9 @@ class DenoisingDataSet(Dataset):
             pad = self.segment_length - noisy.size(1)
             noisy = torch.nn.functional.pad(noisy, (0, pad))
             clean = torch.nn.functional.pad(clean, (0, pad))
+
+        if self.use_augmentation:
+            self._augment(noisy, clean)
 
         return {
             "noisy": noisy,

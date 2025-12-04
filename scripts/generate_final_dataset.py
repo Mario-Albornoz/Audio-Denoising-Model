@@ -1,42 +1,22 @@
 import os
 import random
 
-import soundfile as sf
-import torch
 import torchaudio
 from tqdm import tqdm
 from pathlib import Path
 
+from src.utils.audio_dataset import DenoisingDataSet
+from src.utils.audio_processing_utils import *
+
 RAW_PATH = Path('../data/raw')
-PROCESSED_PATH = Path('../data/processed')
-NOISE_PATH = Path('../data/noise')
+TRAIN_PROCESSED_PATH = Path('../data/processed')
+TRAIN_NOISE_PATH = Path('../data/noise')
+TEST_CLEAN = Path('../data/test/clean')
+TEST_NOISY = Path('../data/test/noisy')
 
 TARGET_SR: int = int(os.getenv("TARGET_RESAMPLE_RATE", 16000))
 SNR_RANGE: tuple[int, int] = (0, 20)
 SEGMENT_LENGTH: int = TARGET_SR * 90
-
-
-def load_audio_soundfile(file_path):
-    """Load audio using soundfile directly"""
-    data, sr = sf.read(str(file_path), dtype='float32')
-    waveform = torch.from_numpy(data.T)
-    if waveform.dim() == 1:
-        waveform = waveform.unsqueeze(0)
-    return waveform, sr
-
-
-def add_noise(clean, noise, snr_db):
-    if noise.size(1) < clean.size(1):
-        repeats = (clean.size(1) // noise.size(1)) + 1
-        noise = noise.repeat(1, repeats)
-    noise = noise[:, :clean.size(1)]
-
-    snr = 10 ** (snr_db / 10)
-    clean_power = clean.norm(p=2)
-    noise_power = noise.norm(p=2)
-    scale = clean_power / (snr * noise_power)
-
-    return clean + scale * noise
 
 
 def process_dataset() -> None:
@@ -44,7 +24,7 @@ def process_dataset() -> None:
     NOISE_EXTENSIONS = [".wav", ".WAV"]
 
     clean_files = [f for ext in EXTENSIONS for f in RAW_PATH.rglob(f"*{ext}")]
-    noise_files = [f for ext in NOISE_EXTENSIONS for f in NOISE_PATH.rglob(f"*{ext}")]
+    noise_files = [f for ext in NOISE_EXTENSIONS for f in TRAIN_NOISE_PATH.rglob(f"*{ext}")]
 
     print("Noise and audio Files Loaded")
 
@@ -55,45 +35,45 @@ def process_dataset() -> None:
         print("No noise audio files found.")
         return
 
-    PROCESSED_PATH.mkdir(parents=True, exist_ok=True)
+    TRAIN_PROCESSED_PATH.mkdir(parents=True, exist_ok=True)
 
     for clean_file in tqdm(clean_files, desc="Generating noisy dataset"):
         try:
-            clean, sr = load_audio_soundfile(clean_file)
-
-            if sr != TARGET_SR:
-                clean = torchaudio.functional.resample(clean, sr, TARGET_SR)
-
-            if clean.size(0) > 1:
-                clean = clean.mean(dim=0, keepdim=True)
-
-            if clean.size(1) > SEGMENT_LENGTH:
-                start = random.randint(0, clean.size(1) - SEGMENT_LENGTH)
-                clean = clean[:, start:start + SEGMENT_LENGTH]
-
-            noise_file = random.choice(noise_files)
-            noise, nsr = load_audio_soundfile(noise_file)
-
-            if nsr != TARGET_SR:
-                noise = torchaudio.functional.resample(noise, nsr, TARGET_SR)
-
-            if noise.size(0) > 1:
-                noise = noise.mean(dim=0, keepdim=True)
-
-            snr = random.uniform(*SNR_RANGE)
-            noisy = add_noise(clean, noise, snr)
-
-            out_name = PROCESSED_PATH / f"{clean_file.stem}.wav"
-
-            sf.write(str(out_name), noisy.squeeze(0).numpy(), TARGET_SR)
-
+            create_noise_file(clean_file, noise_files)
         except Exception as e:
             print(f"Error processing {clean_file}: {e}")
             continue
 
+def create_noise_file(clean_file, noise_files)->None:
+        noise, clean = normalize_tensors(clean_file, noise_files)
+
+        if noise.size(0) > 1:
+            noise = noise.mean(dim=0, keepdim=True)
+
+        snr = random.uniform(*SNR_RANGE)
+        noisy = add_noise(clean, noise, snr)
+
+        out_name = TRAIN_PROCESSED_PATH / f"{clean_file.stem}.wav"
+
+        sf.write(str(out_name), noisy.squeeze(0).numpy(), TARGET_SR)
+
+
+
+
+def split_training_data( size_training_dataset: int) -> None:
+    dataset = DenoisingDataSet(noisy_dir=str(TRAIN_NOISE_PATH), clean_dir= str(TRAIN_PROCESSED_PATH))
+
+    train_clean, train_noisy = dataset.clean_files, dataset.noisy_files
+
+    counter = 0
+    for clean_file, noisy_file in train_clean, train_noisy:
+        while counter < size_training_dataset:
+            os.replace(f"{TRAIN_PROCESSED_PATH}/{clean_file}" , f"{TEST_CLEAN}/{clean_file}")
+            os.replace(f"{TRAIN_NOISE_PATH}/{noisy_file}" , f"{TEST_NOISY}/{noisy_file}")
+
 
 #Important to note, to run this script you need a python envioerment with python version 3.12 to avoid dependency conflicts
 #This script was run once already to generate our data set, only run if you wish to generate a new dataset, since noise addition function is randomized
-#TODO:multithread this script to increase the completion time
 if __name__ == "__main__":
     process_dataset()
+    split_training_data(size_training_dataset=100)

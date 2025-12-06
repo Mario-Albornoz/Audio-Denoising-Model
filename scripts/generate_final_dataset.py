@@ -45,7 +45,7 @@ def process_dataset() -> None:
             continue
 
 def create_noise_file(clean_file, noise_files)->None:
-        noise, clean = normalize_tensors(clean_file, noise_files)
+        noise, clean = normalize_tensors(clean_file, noise_files, TARGET_SR, SEGMENT_LENGTH)
 
         if noise.size(0) > 1:
             noise = noise.mean(dim=0, keepdim=True)

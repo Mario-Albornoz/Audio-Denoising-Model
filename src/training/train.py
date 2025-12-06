@@ -5,21 +5,11 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
 
-from src.evaluation.metrics import SpectralLoss, compute_snr
-from src.model.conv_tasnet import ConvTasNet
+from src.evaluation.metrics import  compute_snr
+from src.model.denoiseSystem import DenoiseSystem
 from src.utils.audio_dataset import DenoisingDataSet
 
-
-class ImprovedDenoiseSystem(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.model = ConvTasNet(N=256, L=20, B=256, P=3, X=8, R=2)
-
-    def forward(self, noisy):
-        return self.model(noisy)
-
 #TODO: refactor training method
-#ADD matrix with hyperparemeters to automize different runs
 def train_model(
         noisy_dir,
         clean_dir,
@@ -37,7 +27,7 @@ def train_model(
         pin_memory=False,
     )
 
-    system = ImprovedDenoiseSystem().to(device)
+    system = DenoiseSystem().to(device)
     optimizer = optim.AdamW(system.parameters(), lr=lr, weight_decay=1e-5)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -61,7 +51,7 @@ def train_model(
 
             optimizer.zero_grad()
             enhanced = system(noisy)
-            loss = loss_function(enhanced, clean)
+            loss =
             snr = compute_snr(clean, enhanced)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(system.parameters(), max_norm=5.0)

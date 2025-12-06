@@ -1,49 +1,4 @@
 import torch
-import torch.nn as nn
-
-class SpectralLoss(nn.Module):
-    def __init__(self, n_fft=512, hop=128, win_len=512):
-        super().__init__()
-        self.l1 = nn.L1Loss()
-        self.window = torch.hann_window(win_len)
-
-        self.n_fft = n_fft
-        self.hop = hop
-        self.win_len = win_len
-
-    def forward(self, pred, target):
-        if pred.dim() == 2:
-            pred = pred.unsqueeze(1)
-        if target.dim() == 2:
-            target = target.unsqueeze(1)
-
-        pred = torch.tanh(pred)
-        target = torch.tanh(target)
-
-        window = self.window.to(pred.device)
-
-        pred_spec = torch.stft(pred.squeeze(1),
-                               n_fft=self.n_fft,
-                               hop_length=self.hop,
-                               win_length=self.win_len,
-                               window=window,
-                               return_complex=True)
-
-        target_spec = torch.stft(target.squeeze(1),
-                                 n_fft=self.n_fft,
-                                 hop_length=self.hop,
-                                 win_length=self.win_len,
-                                 window=window,
-                                 return_complex=True)
-
-        eps = 1e-7
-        pred_mag = pred_spec.abs() + eps
-        target_mag = target_spec.abs() + eps
-
-        time_loss = self.l1(pred, target)
-        mag_loss = self.l1(pred_mag, target_mag)
-
-        return time_loss + 0.3 * mag_loss
 
 def compute_snr(clean : torch.Tensor, enhanced : torch.Tensor, eps = 1e-8):
     #flatten time dimension

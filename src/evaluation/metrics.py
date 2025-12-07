@@ -1,4 +1,57 @@
 import torch
+import torch.nn as nn
+
+class MultiScaleLoss(nn.Module):
+
+    def __init__(self, n_ffts=None, spectral_weight: float = 0.3, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if n_ffts is None:
+            n_ffts = [512, 1024, 2048]
+        self.n_ffts = n_ffts
+        self.spectral_weight = spectral_weight
+        self.L1 = nn.L1Loss()
+
+    def forward(self, pred, target):
+        if pred.dim() == 2:
+            pred = pred.unsqueeze(1)
+        if target.dim() == 2:
+            target = target.unsqueeze(1)
+
+        time_loss = self.L1(pred, target)
+
+        num_scales = len(self.n_ffts)
+        spectral_loss = 0.0
+
+        for n_fft in self.n_ffts:
+            hop_length = n_fft // 4
+            self.register_buffer(f'window_{n_fft}', torch.hann_window(n_fft))
+
+            pred_spectogram = torch.stft(
+                pred.squeeze(1),
+                n_fft= n_fft,
+                hop_length = hop_length,
+                win_length=n_fft,
+                window=torch.hann_window(n_fft).to(pred.device),
+                return_complex=True
+            ).abs()
+
+            target_spectogram = torch.stft(
+                target.squeeze(1),
+                n_fft = n_fft,
+                hop_length = hop_length,
+                win_length=n_fft,
+                window=torch.hann_window(n_fft).to(pred.device),
+                return_complex=True
+            ).abs()
+
+            spectral_loss += self.L1(pred_spectogram, target_spectogram)
+
+        spectral_loss = spectral_loss / num_scales
+        total_loss = (1 - self.spectral_weight) * time_loss + \
+                     self.spectral_weight * spectral_loss
+
+        return total_loss, time_loss, spectral_loss
+
 
 def compute_snr(clean : torch.Tensor, enhanced : torch.Tensor, eps = 1e-8):
     #flatten time dimension

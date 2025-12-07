@@ -1,11 +1,10 @@
 from datetime import timezone, datetime
-import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
 
-from src.evaluation.metrics import  compute_snr
+from src.evaluation.metrics import  MultiScaleLoss
 from src.model.denoiseSystem import DenoiseSystem
 from src.utils.audio_dataset import DenoisingDataSet
 
@@ -34,7 +33,7 @@ def train_model(
         optimizer, mode='min', factor=0.7, patience=5, min_lr = 1e-6
     )
 
-    loss_function = nn.L1Loss()
+    loss_function = MultiScaleLoss()
     best_loss = float('inf')
     patience_counter = 0
     patience = 5
@@ -42,7 +41,8 @@ def train_model(
     for epoch in range(epochs):
         epoch_start = time.time()
         total_loss = 0
-        total_snr = 0
+        total_spectral_loss = 0
+        total_time_loss = 0
         batch_count = 0
 
         for batch_idx, batch in enumerate(loader):
@@ -51,18 +51,18 @@ def train_model(
 
             optimizer.zero_grad()
             enhanced = system(noisy)
-            loss =
-            snr = compute_snr(clean, enhanced)
+            loss, time_loss, spectral_loss = loss_function(enhanced, clean)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(system.parameters(), max_norm=5.0)
             optimizer.step()
 
             total_loss += loss.item()
-            total_snr += snr
+            total_spectral_loss += spectral_loss.item()
+            total_time_loss += time_loss.item()
             batch_count += 1
 
             if (batch_idx + 1) % 25 == 0:
-                print(f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f} - SNR: {snr}")
+                print(f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f} - spectral_loss: {spectral_loss.item(): .6f} time_loss: {time_loss.item():.6f}")
 
             if batch_idx % 2 == 0:
                 torch.mps.empty_cache()
@@ -70,14 +70,16 @@ def train_model(
         del noisy, clean, enhanced, loss
         torch.mps.empty_cache()
         avg_loss = total_loss / batch_count
-        avg_snr = total_snr/batch_count
+        avg_time_loss = total_time_loss / batch_count
+        avg_spectral_loss = total_spectral_loss / batch_count
         epoch_time = time.time() - epoch_start
 
         timestamp = datetime.now(timezone.utc)
         print(
-            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} | SNR: {avg_snr} | Time: {epoch_time / 60:.1f}min")
+            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} spectral_loss: {avg_spectral_loss:.6f} time_loss: {avg_time_loss:.6f}|  Time: {epoch_time / 60:.1f}min")
 
         scheduler.step(avg_loss)
+        scheduler.step(avg_spectral_loss)
 
         if avg_loss < best_loss:
             best_loss = avg_loss

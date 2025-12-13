@@ -3,3 +3,5 @@ data/
 .idea
 .DS_Store
 *.pyc
+/tests/tests.py
+/tests/debug_pipeline.py

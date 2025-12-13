@@ -5,3 +5,5 @@ data/
 *.pyc
 /tests/tests.py
 /tests/debug_pipeline.py
+tests/diagnostic_outputs/
+tests/cleaned_files/

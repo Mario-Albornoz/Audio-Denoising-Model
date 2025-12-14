@@ -5,12 +5,12 @@ import torchaudio.functional as F
 from pathlib import Path
 
 from scripts.generate_final_dataset import TARGET_SR
-from src.model.denoiseSystem import DenoiseSystem
+from src.model.demucs import BaseDemucs
 
 BEST_MODEL_FILE_PATH = '../src/training/best_model.pt'
 
 device = "cpu"
-model = DenoiseSystem().to(device)
+model = BaseDemucs().to(device)
 model.load_state_dict(torch.load(BEST_MODEL_FILE_PATH, map_location=device))
 model.eval()
 
@@ -58,7 +58,6 @@ def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
         noisy = audio.to(device)
         denoised = model(noisy)
 
-        denoised = rescue_broken_model_output(denoised, noisy, alpha=0.3)
         denoised = denoised.squeeze().cpu().numpy()
 
     print(f"Denoised output shape: {denoised.shape}")

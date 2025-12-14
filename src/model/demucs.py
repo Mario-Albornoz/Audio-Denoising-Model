@@ -1,7 +1,8 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from src.utils.resample import *
 
 class BottleNeckLTSM(nn.Module):
     def __init__(self, dim, bi_directional:bool=False, layers:int = 2):
@@ -26,6 +27,7 @@ class BaseDemucs(nn.Module):
             depth : int = 5,
             normalize: bool = True,
             up_scale_factor : int = 2,
+            resmaple :int = 1,
             floor = 1e-3
     ):
 
@@ -40,38 +42,43 @@ class BaseDemucs(nn.Module):
         self.depth = depth
         self.normalize = normalize
         self.up_scale_factor = up_scale_factor
+        self.floor = floor
+        self.resample = resmaple
 
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
 
         channel_scale = 2 #double feature map per convolutional layer because GLU halfs the size of our channels
+        encoder_last_out = 768
 
         for index in range(layers):
+            decoder_target_out = channels_in
             encode = []
             encode += [
-                nn.Conv1d(in_channels=channels_in, out_channels=hidden_channels, kernel_size=kernel_size, stride=stride),
+                nn.Conv1d(in_channels=channels_in, out_channels=hidden_channels, kernel_size=kernel_size,
+                          stride=stride),
                 nn.PReLU(),
                 nn.Conv1d(hidden_channels, hidden_channels * channel_scale, 1),
                 nn.GLU(dim=1)
             ]
             self.encoder.append(nn.Sequential(*encode))
-
+            encoder_out_channels = hidden_channels * channel_scale // 2
             decode = []
             decode += [
-                nn.Conv1d(in_channels=hidden_channels, out_channels=hidden_channels * channel_scale, kernel_size=1),
+                nn.Conv1d(in_channels=encoder_out_channels, out_channels=hidden_channels * channel_scale, kernel_size=1,
+                          stride=1),
                 nn.GLU(dim=1),
-                nn.ConvTranspose1d(hidden_channels, channels_out, kernel_size, stride)
+                nn.ConvTranspose1d(hidden_channels, decoder_target_out, kernel_size, stride)
             ]
-
-            if index > 1:
+            if index < layers - 1:
                 decode.append(nn.ReLU())
+
             self.decoder.append(nn.Sequential(*decode))
 
-            channels_in = hidden_channels
-            channels_out = hidden_channels
+            channels_in = encoder_out_channels
             hidden_channels = min(int(2 * hidden_channels), max_hidden_channels)
+        self.lstm  = BottleNeckLTSM(encoder_out_channels)
 
-        self.lstm = BottleNeckLTSM(channels_out)
 
     def valid_length(self, length):
         length = math.ceil(length * self.resample)
@@ -87,7 +94,7 @@ class BaseDemucs(nn.Module):
         if self.normalize:
             mono = mix.mean(dim=1, keepdim=True)
             std = mono.std(dim=-1, keepdim=True)
-            mix = mix // (std + self.floor)
+            mix = mix / (std + self.floor)
         else:
             std = 1
 
@@ -98,7 +105,9 @@ class BaseDemucs(nn.Module):
         sample = mix
         sample = F.pad(sample, (0, self.valid_length(length) - length))
 
-        #TODO: add upsampling here with function data augmentation
+        if self.resample > 1:
+            for idx in range(0, self.resample//2):
+                sample = F.interpolate(sample, scale_factor=2, mode='linear', align_corners=False)
 
         skips = []
         for encoder in self.encoder:
@@ -109,13 +118,16 @@ class BaseDemucs(nn.Module):
         sample, _ = self.lstm(sample)
         sample = sample.permute(1,2,0)
 
-        for decoder in self.decoder:
+        for decoder in reversed(self.decoder):
             skip = skips.pop(-1)
             sample = sample + skip[..., :sample.shape[-1]]
             sample = decoder(sample)
 
-        #TODO: add downsampling data augmentation enhancement
+        if self.resample > 1:
+            for idx in range(0, self.resample//2):
+                sample = F.interpolate(sample, scale_factor=0.5, mode='linear', align_corners=False)
 
         sample = sample[..., :length]
 
         return sample * std
+

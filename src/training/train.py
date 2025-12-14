@@ -5,10 +5,9 @@ import torch.optim as optim
 import time
 
 from src.evaluation.metrics import  MultiScaleLoss
-from src.model.denoiseSystem import DenoiseSystem
+from src.model.demucs import BaseDemucs
 from src.utils.audio_dataset import DenoisingDataSet
 
-#TODO: refactor training method
 def train_model(
         noisy_dir,
         clean_dir,
@@ -26,7 +25,7 @@ def train_model(
         pin_memory=False,
     )
 
-    system = DenoiseSystem().to(device)
+    system = BaseDemucs().to(device)
     optimizer = optim.AdamW(system.parameters(), lr=lr, weight_decay=1e-5)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(

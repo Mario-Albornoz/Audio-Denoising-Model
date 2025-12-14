@@ -14,10 +14,10 @@ def train_model(
         epochs=30,
         batch_size=4,
         lr=1.5e-4,
-        device=("mps" if torch.backends.mps.is_available() else "cpu"),
+        device="cpu",
         max_audio_length=80000
 ):
-    dataset = DenoisingDataSet(noisy_dir, clean_dir, segment_length=max_audio_length)
+    dataset = DenoisingDataSet(noisy_dir=noisy_dir, clean_dir=clean_dir, segment_length=max_audio_length)
     loader = DataLoader(
         dataset,
         shuffle=True,
@@ -35,7 +35,7 @@ def train_model(
     loss_function = MultiScaleLoss()
     best_loss = float('inf')
     patience_counter = 0
-    patience = 5
+    patience = 10
 
     for epoch in range(epochs):
         epoch_start = time.time()

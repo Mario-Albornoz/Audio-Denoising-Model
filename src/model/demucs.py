@@ -1,7 +1,6 @@
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
 from src.utils.resample import *
 
 class BottleNeckLTSM(nn.Module):
@@ -28,7 +27,8 @@ class BaseDemucs(nn.Module):
             normalize: bool = True,
             up_scale_factor : int = 2,
             resmaple :int = 1,
-            floor = 1e-3
+            floor = 1e-3,
+            lstm = None,
     ):
 
         super().__init__()
@@ -48,7 +48,7 @@ class BaseDemucs(nn.Module):
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
 
-        channel_scale = 2 #double feature map per convolutional layer because GLU halfs the size of our channels
+        channel_scale = 2 #double feature map per convolutional layer because PReLu halfs the size of our channels
         encoder_last_out = 768
 
         for index in range(layers):
@@ -77,7 +77,10 @@ class BaseDemucs(nn.Module):
 
             channels_in = encoder_out_channels
             hidden_channels = min(int(2 * hidden_channels), max_hidden_channels)
-        self.lstm  = BottleNeckLTSM(encoder_out_channels)
+        if not self.lstm:
+            self.lstm  = BottleNeckLTSM(encoder_out_channels)
+        else:
+            self.lstm = lstm
 
 
     def valid_length(self, length):
@@ -89,6 +92,9 @@ class BaseDemucs(nn.Module):
             length = (length - 1) * self.stride + self.kernel_size
         length = int(math.ceil(length / self.resample))
         return int(length)
+
+    def return_hidden_lstm_state(self):
+        return self.lstm
 
     def forward(self, mix:torch.Tensor):
         if self.normalize:
@@ -131,3 +137,65 @@ class BaseDemucs(nn.Module):
 
         return sample * std
 
+class RealTimeDemucs(nn.Module):
+    def __init__(self, model:BaseDemucs = BaseDemucs):
+        super().__init__()
+        self.model = model
+        self.lstm_hidden_state = None
+
+    def forward(self, mix: torch.Tensor):
+        sample = mix
+        if self.model.normalize:
+            mono = mix.mean(dim= 1, keepdim=True)
+            std = mono.std(dim=1, keepdim=True)
+            sample = sample / (std + self.model.floor)
+        else:
+            std = 1
+
+        length = mix.shape[-1]
+        sample = mix
+        sample = F.pad(sample, (0, self.model.valid_length(length) - length))
+
+        skips = []
+        for encode in self.model.encoder:
+            sample = encode(sample)
+            skips.append(sample)
+
+        sample = sample.permute(2, 0, 1)
+        sample, self.lstm_hidden_state = self.model.lstm(sample, self.lstm_hidden_state)
+        sample = sample.permute(1, 2, 0)
+
+        for decoder in reversed(self.model.decoder):
+            skip = skips.pop(-1)
+            sample = sample + skip[:, :sample.shape[-1]]
+            sample = decoder(sample)
+
+        return sample * std
+
+    def reset(self):
+        self.lstm_hidden_state = None
+
+class ProcessRealTime:
+    def __init__(self, trained_model_path: str,  base_model: BaseDemucs = BaseDemucs, device: str = 'cpu'):
+        self.base_model = base_model
+        self.device = device
+        self.base_model.load_state_dict(torch.load(trained_model_path, map_location=device))
+        self.base_model.eval()
+
+        self.model = RealTimeDemucs(model= base_model).to(device)
+
+    @torch.no_grad()
+    def process_batch(self, audio:np.ndarray) -> np.ndarray:
+        data: torch.Tensor = torch.from_numpy(audio)
+
+        if data.dim() == 1:
+            data = data.unsqueeze(0).unsqueeze(0)
+        elif data.dim() == 2:
+            data = data.unsqueeze(0)
+
+        enhanced: torch.Tensor = self.model(data)
+
+        return enhanced.squeeze(0).cpu().numpy()
+
+    def reset(self):
+        self.model.reset()

@@ -2,6 +2,7 @@ import random
 
 import soundfile as sf
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 import torchaudio
 from pathlib import Path
@@ -106,8 +107,8 @@ class DenoisingDataSet(Dataset):
 
         if noisy.size(1) < self.segment_length:
             pad = self.segment_length - noisy.size(1)
-            noisy = torch.nn.functional.pad(noisy, (0, pad))
-            clean = torch.nn.functional.pad(clean, (0, pad))
+            noisy = F.pad(noisy, (0, pad))
+            clean = F.pad(clean, (0, pad))
 
         if self.use_augmentation:
             self._augment(noisy, clean)

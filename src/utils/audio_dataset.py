@@ -1,5 +1,4 @@
 import random
-
 import soundfile as sf
 import torch
 import torch.nn.functional as F
@@ -7,13 +6,16 @@ from torch.utils.data import Dataset
 import torchaudio
 from pathlib import Path
 
+from src.utils.audio_processing_utils import find_corrupted_files
 
+
+#TODO:optimize this class to improve initial load of dataset
 class DenoisingDataSet(Dataset):
     def __init__(
             self,
             noisy_dir: str,
             clean_dir: str,
-            target_sr: int = 16000,
+            target_sr: int = 44100,
             segment_length: int = 80000,
             use_augmentation: bool = False
     ):
@@ -30,8 +32,15 @@ class DenoisingDataSet(Dataset):
         return len(self.noisy_files)
 
     def clear_unmateched_file(self):
-        noise_files = list(self.noisy_dir.glob("*.wav"))
-        raw_files = list(self.clean_dir.glob("*.wav"))
+        unclean_noise_files = list(self.noisy_dir.glob("*.wav"))
+        unclean_raw_files = list(self.clean_dir.glob("*.wav"))
+
+        corrupted_clean_files = find_corrupted_files(self.clean_dir)
+        corrupted_noisy_files = find_corrupted_files(self.noisy_dir)
+        joined_corrupted_files = set(corrupted_noisy_files + corrupted_clean_files)
+
+        noise_files = sorted([f for f in unclean_noise_files if f not in joined_corrupted_files])
+        raw_files = sorted([f for f in unclean_raw_files if f not in joined_corrupted_files])
 
         print(len(noise_files), len(raw_files))
 
@@ -118,3 +127,8 @@ class DenoisingDataSet(Dataset):
             "clean": clean,
             "stem": noisy_path.stem
         }
+
+
+if __name__ == "__main__":
+    find_corrupted_files('../../data/train/clean')
+    find_corrupted_files('../../data/train/noisy')

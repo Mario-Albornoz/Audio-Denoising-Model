@@ -3,7 +3,7 @@ data/
 .idea
 .DS_Store
 *.pyc
-/tests/tests.py
+/tests/test_workflow.py
 /tests/debug_pipeline.py
 tests/diagnostic_outputs/
 tests/cleaned_files/

@@ -11,7 +11,7 @@ from src.utils.audio_dataset import DenoisingDataSet
 def train_model(
         noisy_dir,
         clean_dir,
-        epochs=30,
+        epochs=80,
         batch_size=4,
         lr=1e-3,
         device="cpu",

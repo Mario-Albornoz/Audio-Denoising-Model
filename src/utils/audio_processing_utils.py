@@ -1,4 +1,5 @@
 import soundfile as sf
+from pathlib import Path
 import random
 import torchaudio
 import torch
@@ -9,7 +10,6 @@ def load_audio_soundfile(file_path):
     if waveform.dim() == 1:
         waveform = waveform.unsqueeze(0)
     return waveform, sr
-
 
 def add_noise(clean, noise, snr_db):
     if noise.size(1) < clean.size(1):
@@ -44,3 +44,13 @@ def normalize_tensors(clean_file:str, noise_files:list, target_sr:int, segment_l
         noise = torchaudio.functional.resample(noise, nsr, target_sr)
 
     return noise, clean
+
+def find_corrupted_files(directory):
+    corrupted_files = []
+    for wav_file in Path(directory).glob("*.wav"):
+        try:
+            sf.info(str(wav_file))
+        except:
+            print(f"Corrupted: {wav_file}")
+            corrupted_files.append(wav_file)
+    return corrupted_files

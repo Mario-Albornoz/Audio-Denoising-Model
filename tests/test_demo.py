@@ -15,17 +15,6 @@ model.load_state_dict(torch.load(BEST_MODEL_FILE_PATH, map_location=device))
 model.eval()
 
 
-def rescue_broken_model_output(denoised, original_noisy, alpha=0.3):
-
-    denoised_norm = denoised / (denoised.abs().max() + 1e-8)
-    noisy_norm = original_noisy / (original_noisy.abs().max() + 1e-8)
-
-    mixed = (1 - alpha) * denoised_norm + alpha * noisy_norm
-
-    mixed = mixed * original_noisy.abs().max()
-
-    return mixed
-
 def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
 
     audio, sr = sf.read(noisy_file_path, dtype='float32')
@@ -75,5 +64,5 @@ def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    demo_denoise_pipeline("./cleaned_files/cleand_directinput_01.wav", "../data/processed/exo_Set3_aug.wav")
+    demo_denoise_pipeline("./cleaned_files/cleaned_directinput_01.wav", "../data/train/noisy/directinput_01.wav")
 

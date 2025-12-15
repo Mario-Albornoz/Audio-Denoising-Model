@@ -13,7 +13,7 @@ def train_model(
         clean_dir,
         epochs=30,
         batch_size=4,
-        lr=1.5e-4,
+        lr=1e-3,
         device="cpu",
         max_audio_length=80000
 ):
@@ -96,6 +96,6 @@ def train_model(
 
 if __name__ == "__main__":
     train_model(
-        noisy_dir="../../data/processed",
-        clean_dir="../../data/raw",
+        noisy_dir="../../data/train/noisy",
+        clean_dir="../../data/train/clean",
     )

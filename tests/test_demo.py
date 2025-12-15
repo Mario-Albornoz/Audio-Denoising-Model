@@ -75,5 +75,5 @@ def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    demo_denoise_pipeline("./cleaned_files/cleand_directinput_01.wav", "../data/processed/ANiMAL - Clinic A.stem.wav")
+    demo_denoise_pipeline("./cleaned_files/cleand_directinput_01.wav", "../data/processed/exo_Set3_aug.wav")
 

@@ -28,7 +28,6 @@ class BaseDemucs(nn.Module):
             up_scale_factor : int = 2,
             resmaple :int = 1,
             floor = 1e-3,
-            lstm = None,
     ):
 
         super().__init__()
@@ -49,7 +48,6 @@ class BaseDemucs(nn.Module):
         self.decoder = nn.ModuleList()
 
         channel_scale = 2 #double feature map per convolutional layer because PReLu halfs the size of our channels
-        encoder_last_out = 768
 
         for index in range(layers):
             decoder_target_out = channels_in
@@ -77,10 +75,8 @@ class BaseDemucs(nn.Module):
 
             channels_in = encoder_out_channels
             hidden_channels = min(int(2 * hidden_channels), max_hidden_channels)
-        if not self.lstm:
-            self.lstm  = BottleNeckLTSM(encoder_out_channels)
-        else:
-            self.lstm = lstm
+
+        self.lstm  = BottleNeckLTSM(encoder_out_channels)
 
 
     def valid_length(self, length):

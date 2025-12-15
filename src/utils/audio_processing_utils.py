@@ -24,7 +24,7 @@ def add_noise(clean, noise, snr_db):
 
     return clean + scale * noise
 
-def normalize_tensors(clean_file:torch.Tensor, noise_files:torch.Tensor, target_sr:int, segment_length:int) -> tuple[torch.Tensor, torch.Tensor]:
+def normalize_tensors(clean_file:str, noise_files:list, target_sr:int, segment_length:int) -> tuple[torch.Tensor, torch.Tensor]:
     clean, sr = load_audio_soundfile(clean_file)
 
     if sr != target_sr:

@@ -33,7 +33,7 @@ class MultiScaleLoss(nn.Module):
 
         # Pre-register Hann windows to avoid recreating them
         for n_fft in n_ffts:
-            self.register_buffer(f'windowr{n_fft}', torch.hann_window(n_fft))
+            self.register_buffer(f'window_{n_fft}', torch.hann_window(n_fft))
 
         # Mel filterbanks for perceptual weighting
         if use_mel_scale:

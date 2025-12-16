@@ -4,7 +4,7 @@ import torchaudio.functional as F
 from pathlib import Path
 
 from scripts.generate_final_dataset import TARGET_SR
-from src.evaluation.metrics import MultiScaleLoss
+from src.evaluation.metrics import MultiScaleLoss, compute_snr
 from src.model.demucs import BaseDemucs
 from src.utils.audio_processing_utils import find_corrupted_files
 
@@ -61,6 +61,7 @@ def test_model(noisy_dir_path, clean_dir_path):
     avg_loss = 0
     avg_time_loss = 0
     avg_spectral_loss = 0
+    avg_snr = 0
     loss_function = MultiScaleLoss()
 
     print('starting training loop...')
@@ -83,9 +84,12 @@ def test_model(noisy_dir_path, clean_dir_path):
         clean_audio = validate_and_normalize_audio(clean_audio, clean_sr)
 
         loss, time_loss, spectral_loss = loss_function(enhanced_audio, clean_audio)
+        snr = compute_snr(clean=clean_audio, enhanced=enhanced_audio)
+
         avg_loss += loss.item()
         avg_time_loss += time_loss.item()
         avg_spectral_loss += spectral_loss.item()
+        avg_snr += snr.item()
 
         del clean_audio, noisy_audio, loss, spectral_loss, time_loss
 
@@ -94,6 +98,7 @@ def test_model(noisy_dir_path, clean_dir_path):
     avg_loss /= num_samples
     avg_time_loss /= num_samples
     avg_spectral_loss /= num_samples
+    avg_snr /= num_samples
 
     print("\n" + "=" * 60)
     print("FINAL EVALUATION RESULTS")
@@ -102,6 +107,7 @@ def test_model(noisy_dir_path, clean_dir_path):
     print(f"\nAverage Total Loss:     {avg_loss:.6f}")
     print(f"Average Time Loss:      {avg_time_loss:.6f}")
     print(f"Average Spectral Loss:  {avg_spectral_loss:.6f}")
+    print(f"Average snr :  {avg_snr:.6f}")
     print("\n" + "=" * 60)
 
     return {
@@ -113,3 +119,4 @@ def test_model(noisy_dir_path, clean_dir_path):
 
 if __name__ == "__main__":
     test_model(noisy_dir_path=TRAIN_NOISY_DIR_PATH,clean_dir_path=TRAIN_CLEAN_DIR_PATH)
+    test_model(noisy_dir_path=TEST_NOISY_DIR_PATH, clean_dir_path=TEST_CLEAN_DIR_PATH)

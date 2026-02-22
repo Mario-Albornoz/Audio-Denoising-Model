@@ -74,6 +74,3 @@ This supervised setup allows the model to learn effective noise removal.
 
 ---
 
-## Directory Structure
-
-Example project structure:

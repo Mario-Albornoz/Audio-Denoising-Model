@@ -74,3 +74,19 @@ This supervised setup allows the model to learn effective noise removal.
 
 ---
 
+##Missing instructions for running dataset generation script
+
+## How to run demo:
+```
+pip install -r requirements.txt
+```
+### Move to test directory and run test_demo.py file:
+```
+cd test
+python test_demo.py
+```
+or with Python3:
+```
+cd test
+python3 test_demo.py
+```

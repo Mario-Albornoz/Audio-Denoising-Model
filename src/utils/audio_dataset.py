@@ -9,15 +9,15 @@ from pathlib import Path
 from src.utils.audio_processing_utils import find_corrupted_files
 
 
-#TODO:optimize this class to improve initial load of dataset
+# TODO:optimize this class to improve initial load of dataset
 class DenoisingDataSet(Dataset):
     def __init__(
-            self,
-            noisy_dir: str,
-            clean_dir: str,
-            target_sr: int = 44100,
-            segment_length: int = 80000,
-            use_augmentation: bool = False
+        self,
+        noisy_dir: str,
+        clean_dir: str,
+        target_sr: int = 44100,
+        segment_length: int = 80000,
+        use_augmentation: bool = False,
     ):
         self.noisy_dir = Path(noisy_dir)
         self.clean_dir = Path(clean_dir)
@@ -26,7 +26,6 @@ class DenoisingDataSet(Dataset):
         self.stems: list[str] = []
         self.clear_unmateched_file()
         self.use_augmentation = use_augmentation
-
 
     def __len__(self):
         return len(self.noisy_files)
@@ -39,8 +38,12 @@ class DenoisingDataSet(Dataset):
         corrupted_noisy_files = find_corrupted_files(self.noisy_dir)
         joined_corrupted_files = set(corrupted_noisy_files + corrupted_clean_files)
 
-        noise_files = sorted([f for f in unclean_noise_files if f not in joined_corrupted_files])
-        raw_files = sorted([f for f in unclean_raw_files if f not in joined_corrupted_files])
+        noise_files = sorted(
+            [f for f in unclean_noise_files if f not in joined_corrupted_files]
+        )
+        raw_files = sorted(
+            [f for f in unclean_raw_files if f not in joined_corrupted_files]
+        )
 
         print(len(noise_files), len(raw_files))
 
@@ -54,18 +57,27 @@ class DenoisingDataSet(Dataset):
         print(len(self.noisy_files), len(self.clean_files))
 
         if len(noise_files) != len(self.noisy_files):
-            print(f"Filtered out {len(noise_files) - len(self.noisy_files)} noisy files without matching clean files")
+            print(
+                f"Filtered out {len(noise_files) - len(self.noisy_files)} noisy files without matching clean files"
+            )
         if len(raw_files) != len(self.clean_files):
-            print(f"Filtered out {len(raw_files) - len(self.clean_files)} clean files without matching noisy files")
+            print(
+                f"Filtered out {len(raw_files) - len(self.clean_files)} clean files without matching noisy files"
+            )
 
         if len(self.noisy_files) != len(self.clean_files):
-            print("Noisy file count ", len(self.noisy_files), "clean file count: ", len(self.clean_files))
+            print(
+                "Noisy file count ",
+                len(self.noisy_files),
+                "clean file count: ",
+                len(self.clean_files),
+            )
             raise ValueError("Mismatch in dataset length: noisy vs clean file counts")
 
         self.stems = [p.stem for p in self.noisy_files]
 
-    def _load_and_resample(self, path: Path ):
-        data, sr = sf.read(str(path), dtype='float32')
+    def _load_and_resample(self, path: Path):
+        data, sr = sf.read(str(path), dtype="float32")
         waveform = torch.from_numpy(data)
 
         if waveform.dim() == 1:
@@ -83,12 +95,12 @@ class DenoisingDataSet(Dataset):
 
     def _augment(self, noisy, clean):
         if random.random() > 0.5:
-            gain = random.uniform(0.7,0.13)
+            gain = random.uniform(0.7, 0.13)
             noisy = gain * noisy
             clean = gain * clean
 
         if random.random() > 0.5:
-            shift = random.randint(-1000,1000)
+            shift = random.randint(-1000, 1000)
             noisy = torch.roll(noisy, shifts=shift, dims=-1)
             clean = torch.roll(clean, shifts=shift, dims=-1)
 
@@ -111,8 +123,8 @@ class DenoisingDataSet(Dataset):
 
         if min_len > self.segment_length:
             start = random.randint(0, min_len - self.segment_length)
-            noisy = noisy[:, start:start + self.segment_length]
-            clean = clean[:, start:start + self.segment_length]
+            noisy = noisy[:, start : start + self.segment_length]
+            clean = clean[:, start : start + self.segment_length]
 
         if noisy.size(1) < self.segment_length:
             pad = self.segment_length - noisy.size(1)
@@ -122,13 +134,9 @@ class DenoisingDataSet(Dataset):
         if self.use_augmentation:
             self._augment(noisy, clean)
 
-        return {
-            "noisy": noisy,
-            "clean": clean,
-            "stem": noisy_path.stem
-        }
+        return {"noisy": noisy, "clean": clean, "stem": noisy_path.stem}
 
 
 if __name__ == "__main__":
-    find_corrupted_files('../../data/train/clean')
-    find_corrupted_files('../../data/train/noisy')
+    find_corrupted_files("../../data/train/clean")
+    find_corrupted_files("../../data/train/noisy")

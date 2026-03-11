@@ -1,17 +1,18 @@
-import torch
-from src.utils.audio_dataset import DenoisingDataSet
 import soundfile as sf
+import torch
 
-print("="*60)
+from src.utils.audio_dataset import DenoisingDataSet
+
+print("=" * 60)
 print("CHECKING TRAINING DATA FORMAT")
-print("="*60)
+print("=" * 60)
 
 # Load dataset the same way training does
 dataset = DenoisingDataSet(
     noisy_dir="../data/processed",
     clean_dir="../data/raw",
     target_sr=16000,
-    segment_length=80000
+    segment_length=80000,
 )
 
 print(f"\nDataset has {len(dataset)} samples")
@@ -20,8 +21,8 @@ print(f"\nDataset has {len(dataset)} samples")
 sample = dataset[0]
 print(f"\nSample 0: {sample['stem']}")
 
-noisy = sample['noisy']
-clean = sample['clean']
+noisy = sample["noisy"]
+clean = sample["clean"]
 
 print(f"\nNoisy tensor:")
 print(f"  Shape: {noisy.shape}")
@@ -39,8 +40,8 @@ print(f"\nDifference (noisy - clean): {diff:.6f}")
 
 # Calculate SNR
 noise = noisy - clean
-signal_power = (clean ** 2).sum()
-noise_power = (noise ** 2).sum()
+signal_power = (clean**2).sum()
+noise_power = (noise**2).sum()
 
 if noise_power > 0:
     snr = 10 * torch.log10(signal_power / noise_power)
@@ -53,9 +54,9 @@ print(f"\nSaving samples for inspection...")
 sf.write("training_noisy_sample.wav", noisy[0].numpy(), 16000)
 sf.write("training_clean_sample.wav", clean[0].numpy(), 16000)
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("DIAGNOSIS:")
-print("="*60)
+print("=" * 60)
 
 if diff < 0.001:
     print("❌ CRITICAL: Noisy and clean are almost identical!")

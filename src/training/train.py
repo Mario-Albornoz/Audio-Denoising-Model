@@ -4,20 +4,23 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import time
 
-from src.evaluation.metrics import  MultiScaleLoss
+from src.evaluation.metrics import MultiScaleLoss
 from src.model.demucs import BaseDemucs
 from src.utils.audio_dataset import DenoisingDataSet
 
+
 def train_model(
-        noisy_dir,
-        clean_dir,
-        epochs=80,
-        batch_size=4,
-        lr=1e-3,
-        device="cpu",
-        max_audio_length=80000
+    noisy_dir,
+    clean_dir,
+    epochs=80,
+    batch_size=4,
+    lr=1e-3,
+    device="cpu",
+    max_audio_length=80000,
 ):
-    dataset = DenoisingDataSet(noisy_dir=noisy_dir, clean_dir=clean_dir, segment_length=max_audio_length)
+    dataset = DenoisingDataSet(
+        noisy_dir=noisy_dir, clean_dir=clean_dir, segment_length=max_audio_length
+    )
     loader = DataLoader(
         dataset,
         shuffle=True,
@@ -29,11 +32,11 @@ def train_model(
     optimizer = optim.AdamW(system.parameters(), lr=lr, weight_decay=1e-5)
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.7, patience=5, min_lr = 1e-6
+        optimizer, mode="min", factor=0.7, patience=5, min_lr=1e-6
     )
 
     loss_function = MultiScaleLoss()
-    best_loss = float('inf')
+    best_loss = float("inf")
     patience_counter = 0
     patience = 10
 
@@ -61,7 +64,9 @@ def train_model(
             batch_count += 1
 
             if (batch_idx + 1) % 25 == 0:
-                print(f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f} - spectral_loss: {spectral_loss.item(): .6f} time_loss: {time_loss.item():.6f}")
+                print(
+                    f"  Batch {batch_idx + 1}/{len(loader)} - Loss: {loss.item():.6f} - spectral_loss: {spectral_loss.item(): .6f} time_loss: {time_loss.item():.6f}"
+                )
 
             if batch_idx % 2 == 0:
                 torch.mps.empty_cache()
@@ -75,7 +80,8 @@ def train_model(
 
         timestamp = datetime.now(timezone.utc)
         print(
-            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} spectral_loss: {avg_spectral_loss:.6f} time_loss: {avg_time_loss:.6f}|  Time: {epoch_time / 60:.1f}min")
+            f"{timestamp.strftime('%H:%M:%S')} | Epoch {epoch + 1}/{epochs} | Loss: {avg_loss:.6f} spectral_loss: {avg_spectral_loss:.6f} time_loss: {avg_time_loss:.6f}|  Time: {epoch_time / 60:.1f}min"
+        )
 
         scheduler.step(avg_loss)
         scheduler.step(avg_spectral_loss)

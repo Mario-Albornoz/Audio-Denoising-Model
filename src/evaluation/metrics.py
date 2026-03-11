@@ -8,13 +8,13 @@ class MultiScaleLoss(nn.Module):
     """
 
     def __init__(
-            self,
-            n_ffts=None,
-            spectral_weight: float = 0.5,  # Increased for music
-            use_mel_scale: bool = True,
-            use_log_magnitude: bool = True,
-            perceptual_weighting: bool = True,
-            sample_rate: int = 16000
+        self,
+        n_ffts=None,
+        spectral_weight: float = 0.5,  # Increased for music
+        use_mel_scale: bool = True,
+        use_log_magnitude: bool = True,
+        perceptual_weighting: bool = True,
+        sample_rate: int = 16000,
     ):
         super().__init__()
 
@@ -33,7 +33,7 @@ class MultiScaleLoss(nn.Module):
 
         # Pre-register Hann windows to avoid recreating them
         for n_fft in n_ffts:
-            self.register_buffer(f'window_{n_fft}', torch.hann_window(n_fft))
+            self.register_buffer(f"window_{n_fft}", torch.hann_window(n_fft))
 
         # Mel filterbanks for perceptual weighting
         if use_mel_scale:
@@ -55,9 +55,13 @@ class MultiScaleLoss(nn.Module):
         bin_points = torch.floor((n_fft + 1) * hz_points / sample_rate).long()
 
         for i in range(n_mels):
-            left, center, right = bin_points[i:i + 3]
-            mel_basis[i, left:center] = (torch.arange(left, center).float() - left) / (center - left)
-            mel_basis[i, center:right] = (right - torch.arange(center, right).float()) / (right - center)
+            left, center, right = bin_points[i : i + 3]
+            mel_basis[i, left:center] = (torch.arange(left, center).float() - left) / (
+                center - left
+            )
+            mel_basis[i, center:right] = (
+                right - torch.arange(center, right).float()
+            ) / (right - center)
 
         return mel_basis
 
@@ -76,7 +80,7 @@ class MultiScaleLoss(nn.Module):
     def _compute_spectral_loss(self, pred, target, n_fft):
         """Compute spectral loss for a given FFT size"""
         hop_length = n_fft // 4
-        window = getattr(self, f'window_{n_fft}').to(pred.device)
+        window = getattr(self, f"window_{n_fft}").to(pred.device)
 
         pred_spec = torch.stft(
             pred.squeeze(1),
@@ -86,7 +90,7 @@ class MultiScaleLoss(nn.Module):
             window=window,
             return_complex=True,
             center=True,
-            normalized=False
+            normalized=False,
         )
 
         target_spec = torch.stft(
@@ -97,7 +101,7 @@ class MultiScaleLoss(nn.Module):
             window=window,
             return_complex=True,
             center=True,
-            normalized=False
+            normalized=False,
         )
 
         pred_mag = pred_spec.abs()
@@ -105,8 +109,12 @@ class MultiScaleLoss(nn.Module):
 
         if self.use_mel_scale and n_fft in self.mel_filters:
             mel_filter = self.mel_filters[n_fft].to(pred.device)
-            pred_mag = torch.matmul(pred_mag.transpose(1, 2), mel_filter.T).transpose(1, 2)
-            target_mag = torch.matmul(target_mag.transpose(1, 2), mel_filter.T).transpose(1, 2)
+            pred_mag = torch.matmul(pred_mag.transpose(1, 2), mel_filter.T).transpose(
+                1, 2
+            )
+            target_mag = torch.matmul(
+                target_mag.transpose(1, 2), mel_filter.T
+            ).transpose(1, 2)
 
         if self.use_log_magnitude:
             pred_mag = torch.log1p(pred_mag)  # log(1 + x) for numerical stability
@@ -117,7 +125,9 @@ class MultiScaleLoss(nn.Module):
         if self.perceptual_weighting:
             pred_phase = pred_spec.angle()
             target_phase = target_spec.angle()
-            phase_diff = torch.abs(torch.angle(torch.exp(1j * (pred_phase - target_phase))))
+            phase_diff = torch.abs(
+                torch.angle(torch.exp(1j * (pred_phase - target_phase)))
+            )
             phase_loss = phase_diff.mean()
 
             return 0.7 * mag_loss + 0.3 * phase_loss
@@ -148,25 +158,33 @@ class MultiScaleLoss(nn.Module):
 
         spectral_loss = spectral_loss / num_scales
 
-        total_loss = (1 - self.spectral_weight) * time_loss + \
-                     self.spectral_weight * spectral_loss
+        total_loss = (
+            1 - self.spectral_weight
+        ) * time_loss + self.spectral_weight * spectral_loss
 
         return total_loss, time_loss, spectral_loss
 
 
-def compute_snr(clean : torch.Tensor, enhanced : torch.Tensor, eps = 1e-8):
-    #flatten time dimension
+def compute_snr(clean: torch.Tensor, enhanced: torch.Tensor, eps=1e-8):
+    # flatten time dimension
     noise = enhanced - clean
 
-    #-1 and -2 represent the last dimensions of the file (time (sample_rate) and chanels)
-    clean_power = torch.mean(clean ** 2, dim=(-1,-2)) if clean.dim() > 1 else torch.mean(clean**2)
-    noise_power = torch.mean(noise ** 2, dim=(-1, -2)) if noise.dim() > 1 else torch.mean(noise ** 2)
+    # -1 and -2 represent the last dimensions of the file (time (sample_rate) and chanels)
+    clean_power = (
+        torch.mean(clean**2, dim=(-1, -2)) if clean.dim() > 1 else torch.mean(clean**2)
+    )
+    noise_power = (
+        torch.mean(noise**2, dim=(-1, -2)) if noise.dim() > 1 else torch.mean(noise**2)
+    )
 
-    snr = 10.0 * torch.log10((clean_power + eps)/(noise_power + eps))
+    snr = 10.0 * torch.log10((clean_power + eps) / (noise_power + eps))
 
     return snr
 
-def compute_lsd(clean : torch.Tensor, enhanced : torch.Tensor, n_fft = 512,eps = 1e-8) -> float:
+
+def compute_lsd(
+    clean: torch.Tensor, enhanced: torch.Tensor, n_fft=512, eps=1e-8
+) -> float:
     if clean.dim() == 2:
         clean = clean.unsqueeze(0)
         enhanced = enhanced.unsqueeze(0)
@@ -175,18 +193,20 @@ def compute_lsd(clean : torch.Tensor, enhanced : torch.Tensor, n_fft = 512,eps =
         enhanced = enhanced.squeeze(1)
 
     S_clean = torch.stft(clean, n_fft=n_fft, hop_length=n_fft // 4, return_complex=True)
-    S_enh = torch.stft(enhanced, n_fft=n_fft, hop_length=n_fft // 4, return_complex=True)
+    S_enh = torch.stft(
+        enhanced, n_fft=n_fft, hop_length=n_fft // 4, return_complex=True
+    )
     mag_clean = torch.abs(S_clean) + eps
     mag_enh = torch.abs(S_enh) + eps
 
-    log_clean = 10 * torch.log10(mag_clean ** 2 + eps)
-    log_enh = 10 * torch.log10(mag_enh ** 2 + eps)
+    log_clean = 10 * torch.log10(mag_clean**2 + eps)
+    log_enh = 10 * torch.log10(mag_enh**2 + eps)
 
     lsd_frame = ((log_clean - log_enh) ** 2).mean(dim=(-1, -2)).sqrt()
     return float(lsd_frame.mean().item())
 
 
-def si_sdr_loss(estimation, reference, eps=1e-8) -> torch.Tensor  :
+def si_sdr_loss(estimation, reference, eps=1e-8) -> torch.Tensor:
     if estimation.dim() == 2:
         estimation = estimation.unsqueeze(0)
         reference = reference.unsqueeze(0)
@@ -197,10 +217,12 @@ def si_sdr_loss(estimation, reference, eps=1e-8) -> torch.Tensor  :
     s_zm = s - s.mean(dim=1, keepdim=True)
     shat_zm = s_hat - s_hat.mean(dim=1, keepdim=True)
 
-    proj = (torch.sum(shat_zm * s_zm, dim=1, keepdim=True) * s_zm) / (torch.sum(s_zm ** 2, dim=1, keepdim=True) + eps)
+    proj = (torch.sum(shat_zm * s_zm, dim=1, keepdim=True) * s_zm) / (
+        torch.sum(s_zm**2, dim=1, keepdim=True) + eps
+    )
     e_noise = shat_zm - proj
 
-    ratio = torch.sum(proj ** 2, dim=1) / (torch.sum(e_noise ** 2, dim=1) + eps)
+    ratio = torch.sum(proj**2, dim=1) / (torch.sum(e_noise**2, dim=1) + eps)
     si_sdr = 10 * torch.log10(ratio + eps)
 
     return -torch.mean(si_sdr)

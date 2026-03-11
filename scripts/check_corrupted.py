@@ -1,4 +1,5 @@
 import os
+
 import soundfile as sf
 
 
@@ -7,7 +8,7 @@ def check_audio_files(directory):
     valid = []
 
     for filename in os.listdir(directory):
-        if filename.endswith('.wav'):
+        if filename.endswith(".wav"):
             filepath = os.path.join(directory, filename)
             try:
                 # Try to read file info

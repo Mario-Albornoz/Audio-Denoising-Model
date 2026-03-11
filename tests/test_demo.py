@@ -1,13 +1,14 @@
-import torch
-import soundfile as sf
-import numpy as np
-import torchaudio.functional as F
 from pathlib import Path
+
+import numpy as np
+import soundfile as sf
+import torch
+import torchaudio.functional as F
 
 from scripts.generate_final_dataset import TARGET_SR
 from src.model.demucs import BaseDemucs
 
-BEST_MODEL_FILE_PATH = '../src/training/best_model.pt'
+BEST_MODEL_FILE_PATH = "../src/training/best_model.pt"
 
 device = "cpu"
 model = BaseDemucs().to(device)
@@ -17,7 +18,7 @@ model.eval()
 
 def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
 
-    audio, sr = sf.read(noisy_file_path, dtype='float32')
+    audio, sr = sf.read(noisy_file_path, dtype="float32")
     print(f"Loaded audio: shape={audio.shape}, sr={sr}")
 
     audio = torch.from_numpy(audio)
@@ -64,5 +65,7 @@ def demo_denoise_pipeline(result_path: str, noisy_file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    demo_denoise_pipeline("./cleaned_files/cleaned_directinput_01.wav", "../data/train/noisy/directinput_01.wav")
-
+    demo_denoise_pipeline(
+        "./cleaned_files/cleaned_directinput_01.wav",
+        "../data/train/noisy/directinput_01.wav",
+    )
